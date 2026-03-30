@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>流變地理學 Rheological Geography</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a12;
+    overflow: hidden;
+    font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    cursor: crosshair;
+  }
+
+  canvas { display: block; }
+
+  #ui-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #title-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a12 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: opacity 1.5s ease;
+  }
+
+  #title-screen h1 {
+    font-size: 3.5em;
+    color: #e0e0ff;
+    text-shadow: 0 0 30px rgba(100, 150, 255, 0.5);
+    margin-bottom: 10px;
+    letter-spacing: 8px;
+  }
+
+  #title-screen h2 {
+    font-size: 1.4em;
+    color: #8888bb;
+    font-weight: 300;
+    margin-bottom: 50px;
+    letter-spacing: 3px;
+  }
+
+  #start-btn {
+    padding: 15px 60px;
+    font-size: 1.2em;
+    background: transparent;
+    border: 2px solid #6688cc;
+    color: #aabbee;
+    cursor: pointer;
+    pointer-events: all;
+    letter-spacing: 5px;
+    transition: all 0.3s;
+    font-family: inherit;
+  }
+
+  #start-btn:hover {
+    background: rgba(100, 136, 204, 0.2);
+    box-shadow: 0 0 30px rgba(100, 136, 204, 0.3);
+    transform: scale(1.05);
+  }
+
+  #hud {
+    position: fixed;
+    top: 20px; left: 20px;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  .hud-item {
+    color: #8899bb;
+    font-size: 0.85em;
+    margin-bottom: 8px;
+    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+    opacity: 0;
+    transition: opacity 1s;
+  }
+
+  .hud-item.show { opacity: 1; }
+
+  #pressure-bar-container {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 1s;
+  }
+
+  #pressure-bar-container.show { opacity: 1; }
+
+  #pressure-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    transition: width 0.15s, background 0.3s;
+    background: #4466aa;
+  }
+
+  #pressure-label {
+    position: fixed;
+    bottom: 45px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #6677aa;
+    font-size: 0.75em;
+    letter-spacing: 3px;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 1s;
+  }
+
+  #pressure-label.show { opacity: 1; }
+
+  #state-display {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    text-align: right;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 1s;
+  }
+
+  #state-display.show { opacity: 1; }
+
+  #state-name {
+    font-size: 1.6em;
+    color: #aabbdd;
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(100,150,255,0.3);
+  }
+
+  #state-desc {
+    font-size: 0.8em;
+    color: #667799;
+    margin-top: 5px;
+    max-width: 280px;
+    line-height: 1.5;
+    margin-left: auto;
+  }
+
+  #tool-panel {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 15px;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 1s;
+  }
+
+  #tool-panel.show { opacity: 1; }
+
+  .tool-btn {
+    padding: 8px 20px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #8899bb;
+    font-size: 0.8em;
+    cursor: pointer;
+    pointer-events: all;
+    letter-spacing: 2px;
+    transition: all 0.3s;
+    border-radius: 3px;
+    font-family: inherit;
+  }
+
+  .tool-btn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.25);
+  }
+
+  .tool-btn.active {
+    border-color: #6699dd;
+    color: #aaccff;
+    background: rgba(100,150,220,0.15);
+    box-shadow: 0 0 15px rgba(100,150,220,0.2);
+  }
+
+  #event-flash {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2em;
+    color: #fff;
+    letter-spacing: 6px;
+    text-shadow: 0 0 40px rgba(255,100,100,0.6);
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+
+  #instructions {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #556688;
+    font-size: 0.75em;
+    letter-spacing: 2px;
+    z-index: 20;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 1s;
+    line-height: 1.8;
+  }
+
+  #instructions.show { opacity: 1; }
+
+  #narrative-box {
+    position: fixed;
+    bottom: 160px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 500px;
+    text-align: center;
+    color: #7788aa;
+    font-size: 0.85em;
+    line-height: 1.7;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 1.5s;
+    pointer-events: none;
+  }
+
+  #narrative-box.show { opacity: 0.9; }
+</style>
+</head>
+<body>
+
+<div id="title-screen">
+  <h1>流變地理學</h1>
+  <h2>Rheological Geography</h2>
+  <p style="color:#556; max-width:500px; text-align:center; line-height:1.8; margin-bottom:40px; font-size:0.9em;">
+    社會運動如非牛頓流體<br>
+    壓力之下凝固，鬆手之後碎裂<br>
+    演算法與假新聞如暗流，重塑動能的形狀
+  </p>
+  <button id="start-btn" onclick="startGame()">開 始 體 驗</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="hud">
+  <div class="hud-item" id="hud-particles">粒子數: 0</div>
+  <div class="hud-item" id="hud-cohesion">凝聚力: 0%</div>
+  <div class="hud-item" id="hud-entropy">離散度: 0%</div>
+  <div class="hud-item" id="hud-fakenews">假新聞濃度: 0%</div>
+</div>
+
+<div id="state-display">
+  <div id="state-name">液態</div>
+  <div id="state-desc">社群自由流動，意見多元分散</div>
+</div>
+
+<div id="pressure-label">施壓強度 PRESSURE</div>
+<div id="pressure-bar-container"><div id="pressure-bar"></div></div>
+
+<div id="tool-panel">
+  <button class="tool-btn active" data-tool="pressure" onclick="selectTool('pressure')">🫳 施壓</button>
+  <button class="tool-btn" data-tool="algorithm" onclick="selectTool('algorithm')">🌀 演算法</button>
+  <button class="tool-btn" data-tool="fakenews" onclick="selectTool('fakenews')">📡 假新聞</button>
+  <button class="tool-btn" data-tool="movement" onclick="selectTool('movement')">✊ 運動能量</button>
+</div>
+
+<div id="instructions">
+  滑鼠點擊拖曳：施加力量 ｜ 滾輪：調整範圍 ｜ 空白鍵：隨機事件<br>
+  按 R 重置 ｜ 1-4 切換工具
+</div>
+
+<div id="event-flash"></div>
+<div id="narrative-box"></div>
+
+<script>
+// ============ AUDIO ENGINE ============
+class AudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.initialized = false;
+    this.masterGain = null;
+    this.droneOsc = null;
+    this.droneGain = null;
+  }
+
+  init() {
+    if (this.initialized) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.value = 0.3;
+    this.masterGain.connect(this.ctx.destination);
+    this.initialized = true;
+    this.startDrone();
+  }
+
+  startDrone() {
+    // Deep ambient drone
+    this.droneGain = this.ctx.createGain();
+    this.droneGain.gain.value = 0.08;
+    this.droneGain.connect(this.masterGain);
+
+    const freqs = [55, 82.5, 110];
+    this.droneOscs = freqs.map(f => {
+      const osc = this.ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.04;
+      osc.connect(g);
+      g.connect(this.droneGain);
+      osc.start();
+      return { osc, gain: g };
+    });
+  }
+
+  updateDrone(pressure, cohesion) {
+    if (!this.initialized || !this.droneOscs) return;
+    const intensity = 0.03 + pressure * 0.12;
+    this.droneGain.gain.setTargetAtTime(intensity, this.ctx.currentTime, 0.3);
+
+    // Shift frequencies based on state
+    const detune = cohesion * 200 - 100;
+    this.droneOscs.forEach(d => {
+      d.osc.detune.setTargetAtTime(detune, this.ctx.currentTime, 0.5);
+    });
+  }
+
+  playPressure(x, y, intensity) {
+    if (!this.initialized) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = 120 + intensity * 200;
+    gain.gain.value = 0.06 * intensity;
+    gain.gain.exponentialDecayTo = 0.001;
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    gain.gain.setTargetAtTime(0.001, this.ctx.currentTime + 0.1, 0.15);
+    osc.stop(this.ctx.currentTime + 0.4);
+  }
+
+  playSolidify() {
+    if (!this.initialized) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 200;
+    osc.frequency.setTargetAtTime(80, this.ctx.currentTime, 0.3);
+    gain.gain.value = 0.08;
+    gain.gain.setTargetAtTime(0.001, this.ctx.currentTime + 0.3, 0.2);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.8);
+  }
+
+  playFragment() {
+    if (!this.initialized) return;
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 300 + Math.random() * 800;
+        gain.gain.value = 0.03;
+        gain.gain.setTargetAtTime(0.001, this.ctx.currentTime + 0.05, 0.05);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.15);
+      }, i * 60);
+    }
+  }
+
+  playFakeNews() {
+    if (!this.initialized) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const lfo = this.ctx.createOscillator();
+    const lfoGain = this.ctx.createGain();
+
+    lfo.frequency.value = 8;
+    lfoGain.gain.value = 50;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+
+    osc.type = 'sawtooth';
+    osc.frequency.value = 180;
+    gain.gain.value = 0.04;
+    gain.gain.setTargetAtTime(0.001, this.ctx.currentTime + 0.3, 0.15);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    lfo.start();
+    osc.stop(this.ctx.currentTime + 0.6);
+    lfo.stop(this.ctx.currentTime + 0.6);
+  }
+
+  playAlgorithm() {
+    if (!this.initialized) return;
+    const notes = [220, 330, 440, 330];
+    notes.forEach((f, i) => {
+      setTimeout(() => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        gain.gain.value = 0.05;
+        gain.gain.setTargetAtTime(0.001, this.ctx.currentTime + 0.08, 0.06);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+      }, i * 80);
+    });
+  }
+
+  playMovement() {
+    if (!this.initialized) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 150;
+    osc.frequency.setTargetAtTime(400, this.ctx.currentTime, 0.4);
+    gain.gain.value = 0.07;
+    gain.gain.setTargetAtTime(0.001, this.ctx.currentTime + 0.5, 0.2);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.8);
+  }
+
+  playEvent() {
+    if (!this.initialized) return;
+    // Dramatic hit
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.value = 80;
+    gain.gain.value = 0.15;
+    gain.gain.setTargetAtTime(0.001, this.ctx.currentTime + 0.1, 0.3);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 1.0);
+
+    // High ring
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.value = 880;
+    gain2.gain.value = 0.06;
+    gain2.gain.setTargetAtTime(0.001, this.ctx.currentTime + 0.5, 0.3);
+    osc2.connect(gain2);
+    gain2.connect(this.masterGain);
+    osc2.start();
+    osc2.stop(this.ctx.currentTime + 1.2);
+  }
+}
+
+// ============ PARTICLE SYSTEM ============
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const audio = new AudioEngine();
+let gameStarted = false;
+let currentTool = 'pressure';
+let mouseDown = false;
+let mouseX = 0, mouseY = 0;
+let brushRadius = 80;
+let globalPressure = 0;
+let cohesion = 0;
+let entropy = 0.5;
+let fakeNewsLevel = 0;
+let currentState = 'liquid';
+let prevState = 'liquid';
+let particles = [];
+let fakeNewsParticles = [];
+let algorithmWaves = [];
+let eventTimer = 0;
+
+const PARTICLE_COUNT = 600;
+const COLORS = {
+  tw: { r: 80, g: 180, b: 255 },   // Taiwan - blue
+  hk: { r: 255, g: 180, b: 60 },    // Hong Kong - gold
+  neutral: { r: 150, g: 150, b: 180 }
+};
+
+class Particle {
+  constructor() {
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.vx = (Math.random() - 0.5) * 2;
+    this.vy = (Math.random() - 0.5) * 2;
+    this.baseRadius = 2.5 + Math.random() * 2;
+    this.radius = this.baseRadius;
+    this.type = Math.random() < 0.5 ? 'tw' : 'hk';
+    this.color = COLORS[this.type];
+    this.energy = 0.5 + Math.random() * 0.5;
+    this.solidarity = 0;
+    this.corrupted = 0; // fake news corruption
+    this.trail = [];
+    this.phase = Math.random() * Math.PI * 2;
+  }
+
+  update(dt) {
+    this.phase += dt * 2;
+
+    // Base movement - non-Newtonian behavior
+    const localPressure = this.getLocalPressure();
+
+    // Under pressure: solidify (increase viscosity dramatically)
+    if (localPressure > 0.3) {
+      // Shear thickening - non-Newtonian!
+      const resistance = Math.pow(localPressure, 2) * 0.95;
+      this.vx *= (1 - resistance);
+      this.vy *= (1 - resistance);
+      this.solidarity = Math.min(1, this.solidarity + 0.02);
+      this.radius = this.baseRadius * (1 + this.solidarity * 0.5);
+    } else {
+      // Release: fragment and flow
+      this.solidarity = Math.max(0, this.solidarity - 0.005);
+      this.vx += (Math.random() - 0.5) * 0.3 * this.energy;
+      this.vy += (Math.random() - 0.5) * 0.3 * this.energy;
+      this.radius = this.baseRadius * (1 - this.solidarity * 0.2);
+    }
+
+    // Fake news corruption effect
+    if (this.corrupted > 0) {
+      this.vx += (Math.random() - 0.5) * this.corrupted * 2;
+      this.vy += (Math.random() - 0.5) * this.corrupted * 2;
+      this.corrupted = Math.max(0, this.corrupted - 0.002);
+    }
+
+    // Movement energy from social movement tool
+    const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+    const maxSpeed = 4 + this.energy * 3;
+    if (speed > maxSpeed) {
+      this.vx = (this.vx / speed) * maxSpeed;
+      this.vy = (this.vy / speed) * maxSpeed;
+    }
+
+    // Damping
+    this.vx *= 0.98;
+    this.vy *= 0.98;
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // Boundary wrap
+    if (this.x < -10) this.x = W + 10;
+    if (this.x > W + 10) this.x = -10;
+    if (this.y < -10) this.y = H + 10;
+    if (this.y > H + 10) this.y = -10;
+
+    // Trail
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > 8) this.trail.shift();
+  }
+
+  getLocalPressure() {
+    if (!mouseDown) return globalPressure * 0.3;
+    const dx = this.x - mouseX;
+    const dy = this.y - mouseY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < brushRadius) {
+      return Math.max(globalPressure * 0.3, 1 - dist / brushRadius);
+    }
+    return globalPressure * 0.3;
+  }
+
+  draw() {
+    const localP = this.getLocalPressure();
+
+    // Color mixing based on state
+    let r = this.color.r;
+    let g = this.color.g;
+    let b = this.color.b;
+
+    // Solidification makes colors converge
+    if (this.solidarity > 0.3) {
+      r = r * (1 - this.solidarity * 0.3) + 220 * this.solidarity * 0.3;
+      g = g * (1 - this.solidarity * 0.3) + 220 * this.solidarity * 0.3;
+      b = b * (1 - this.solidarity * 0.3) + 255 * this.solidarity * 0.3;
+    }
+
+    // Corruption tints red
+    if (this.corrupted > 0.1) {
+      r = Math.min(255, r + this.corrupted * 150);
+      g *= (1 - this.corrupted * 0.5);
+      b *= (1 - this.corrupted * 0.5);
+    }
+
+    // Trail
+    if (this.trail.length > 2) {
+      ctx.beginPath();
+      ctx.moveTo(this.trail[0].x, this.trail[0].y);
+      for (let i = 1; i < this.trail.length; i++) {
+        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+      }
+      ctx.strokeStyle = `rgba(${r},${g},${b},${0.1 + this.solidarity * 0.15})`;
+      ctx.lineWidth = this.radius * 0.5;
+      ctx.stroke();
+    }
+
+    // Main particle
+    const glow = this.solidarity > 0.5 ? 8 : 3;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r},${g},${b},${0.6 + this.solidarity * 0.4})`;
+    ctx.shadowColor = `rgba(${r},${g},${b},0.5)`;
+    ctx.shadowBlur = glow;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Solidarity connections
+    if (this.solidarity > 0.4) {
+      const connectRange = 40 + this.solidarity * 30;
+      for (let i = 0; i < particles.length; i += 3) {
+        const other = particles[i];
+        if (other === this) continue;
+        const dx = other.x - this.x;
+        const dy = other.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < connectRange && other.solidarity > 0.4) {
+          ctx.beginPath();
+          ctx.moveTo(this.x, this.y);
+          ctx.lineTo(other.x, other.y);
+          ctx.strokeStyle = `rgba(${r},${g},${b},${0.1 * this.solidarity})`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+
+class FakeNewsParticle {
+  constructor(x, y) {
+    this.x = x || Math.random() * W;
+    this.y = y || Math.random() * H;
+    this.vx = (Math.random() - 0.5) * 5;
+    this.vy = (Math.random() - 0.5) * 5;
+    this.life = 1;
+    this.size = 3 + Math.random() * 4;
+    this.symbols = ['!', '?', '假', '假', '!', '⚠'];
+    this.symbol = this.symbols[Math.floor(Math.random() * this.symbols.length)];
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vx *= 0.99;
+    this.vy *= 0.99;
+    this.life -= 0.003;
+
+    // Corrupt nearby particles
+    for (const p of particles) {
+      const dx = p.x - this.x;
+      const dy = p.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 50) {
+        p.corrupted = Math.min(1, p.corrupted + 0.01);
+        p.vx += (Math.random() - 0.5) * 0.5;
+        p.vy += (Math.random() - 0.5) * 0.5;
+      }
+    }
+  }
+
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = this.life * 0.8;
+    ctx.font = `${this.size * 3}px sans-serif`;
+    ctx.fillStyle = `rgba(255, 60, 60, ${this.life})`;
+    ctx.shadowColor = 'rgba(255,0,0,0.5)';
+    ctx.shadowBlur = 10;
+    ctx.fillText(this.symbol, this.x, this.y);
+    ctx.restore();
+  }
+}
+
+class AlgorithmWave {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 0;
+    this.maxRadius = 200 + Math.random() * 150;
+    this.speed = 2 + Math.random() * 2;
+    this.life = 1;
+  }
+
+  update() {
+    this.radius += this.speed;
+    this.life = 1 - this.radius / this.maxRadius;
+
+    // Push particles into clusters
+    if (this.life > 0) {
+      for (const p of particles) {
+        const dx = p.x - this.x;
+        const dy = p.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (Math.abs(dist - this.radius) < 30) {
+          // Algorithm creates echo chambers - same type attracts
+          const angle = Math.atan2(dy, dx);
+          const force = 0.3 * this.life;
+          if (p.type === 'tw') {
+            p.vx += Math.cos(angle + 0.5) * force;
+            p.vy += Math.sin(angle + 0.5) * force;
+          } else {
+            p.vx += Math.cos(angle - 0.5) * force;
+            p.vy += Math.sin(angle - 0.5) * force;
+          }
+        }
+      }
+    }
+  }
+
+  draw() {
+    if (this.life <= 0) return;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(100, 200, 255, ${this.life * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 10]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// ============ EVENTS ============
+const events = [
+  { name: '大規模審查', desc: '平台突然封鎖關鍵字', effect: 'censor',
+    narrative: '演算法黑箱突然啟動，社群動能瞬間凍結...' },
+  { name: '假新聞洪流', desc: '虛假資訊大量湧入', effect: 'fakenews_flood',
+    narrative: '真假難辨的訊息淹沒了公共討論空間...' },
+  { name: '跨境串連', desc: '台港社群互相聲援', effect: 'solidarity',
+    narrative: '兩地社群跨越數位邊界，動能重新匯聚...' },
+  { name: '演算法轉向', desc: '推薦系統突然改變', effect: 'algorithm_shift',
+    narrative: '看不見的手改寫了資訊的流向...' },
+  { name: '白紙革命', desc: '無聲的抗議蔓延', effect: 'movement_surge',
+    narrative: '寂靜之中，運動能量如水般漫開...' },
+  { name: '封號潮', desc: '大量帳號被停權', effect: 'ban_wave',
+    narrative: '數位空間的參與者驟然減少...' },
+  { name: '平台遷移', desc: '用戶湧向新平台', effect: 'migration',
+    narrative: '像河流改道，社群找到新的出口...' },
+];
+
+function triggerEvent() {
+  const event = events[Math.floor(Math.random() * events.length)];
+
+  // Flash event name
+  const flash = document.getElementById('event-flash');
+  flash.textContent = event.name;
+  flash.style.opacity = 1;
+  setTimeout(() => flash.style.opacity = 0, 2500);
+
+  // Show narrative
+  const narr = document.getElementById('narrative-box');
+  narr.textContent = event.narrative;
+  narr.classList.add('show');
+  setTimeout(() => narr.classList.remove('show'), 4000);
+
+  audio.playEvent();
+
+  switch (event.effect) {
+    case 'censor':
+      globalPressure = Math.min(1, globalPressure + 0.5);
+      particles.forEach(p => {
+        p.vx *= 0.1;
+        p.vy *= 0.1;
+        p.solidarity += 0.3;
+      });
+      break;
+    case 'fakenews_flood':
+      for (let i = 0; i < 30; i++) {
+        fakeNewsParticles.push(new FakeNewsParticle());
+      }
+      fakeNewsLevel = Math.min(1, fakeNewsLevel + 0.4);
+      break;
+    case 'solidarity':
+      particles.forEach(p => {
+        const cx = W / 2, cy = H / 2;
+        p.vx += (cx - p.x) * 0.01;
+        p.vy += (cy - p.y) * 0.01;
+        p.energy = Math.min(1, p.energy + 0.3);
+        p.solidarity += 0.2;
+      });
+      break;
+    case 'algorithm_shift':
+      for (let i = 0; i < 5; i++) {
+        algorithmWaves.push(new AlgorithmWave(
+          Math.random() * W, Math.random() * H
+        ));
+      }
+      break;
+    case 'movement_surge':
+      particles.forEach(p => {
+        p.energy = Math.min(1, p.energy + 0.5);
+        p.vx += (Math.random() - 0.5) * 6;
+        p.vy += (Math.random() - 0.5) * 6;
+      });
+      break;
+    case 'ban_wave':
+      // Remove 20% of particles temporarily
+      const removeCount = Math.floor(particles.length * 0.2);
+      for (let i = 0; i < removeCount; i++) {
+        const idx = Math.floor(Math.random() * particles.length);
+        particles[idx].x = -100;
+        particles[idx].y = -100;
+        particles[idx].vx = 0;
+        particles[idx].vy = 0;
+      }
+      setTimeout(() => {
+        particles.forEach(p => {
+          if (p.x < 0) {
+            p.x = Math.random() * W;
+            p.y = Math.random() * H;
+          }
+        });
+      }, 3000);
+      break;
+    case 'migration':
+      const targetX = Math.random() * W;
+      const targetY = Math.random() * H;
+      particles.forEach(p => {
+        p.vx += (targetX - p.x) * 0.005;
+        p.vy += (targetY - p.y) * 0.005;
+        p.energy += 0.1;
+      });
+      break;
+  }
+}
+
+// ============ TOOL ACTIONS ============
+function applyTool(x, y) {
+  switch (currentTool) {
+    case 'pressure':
+      applyPressure(x, y);
+      break;
+    case 'algorithm':
+      if (Math.random() < 0.05) {
+        algorithmWaves.push(new AlgorithmWave(x, y));
+        audio.playAlgorithm();
+      }
+      // Sorting effect
+      particles.forEach(p => {
+        const dx = p.x - x;
+        const dy = p.y - y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < brushRadius) {
+          const angle = Math.atan2(dy, dx);
+          if (p.type === 'tw') {
+            p.vx += Math.cos(angle + Math.PI/4) * 0.5;
+            p.vy += Math.sin(angle + Math.PI/4) * 0.5;
+          } else {
+            p.vx += Math.cos(angle - Math.PI/4) * 0.5;
+            p.vy += Math.sin(angle - Math.PI/4) * 0.5;
+          }
+        }
+      });
+      break;
+    case 'fakenews':
+      if (Math.random() < 0.15) {
+        fakeNewsParticles.push(new FakeNewsParticle(x, y));
+        audio.playFakeNews();
+      }
+      fakeNewsLevel = Math.min(1, fakeNewsLevel + 0.002);
+      break;
+    case 'movement':
+      particles.forEach(p => {
+        const dx = p.x - x;
+        const dy = p.y - y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < brushRadius) {
+          p.energy = Math.min(1, p.energy + 0.02);
+          p.vx += (Math.random() - 0.5) * 2;
+          p.vy += (Math.random() - 0.5) * 2;
+          p.corrupted = Math.max(0, p.corrupted - 0.01);
+        }
+      });
+      if (Math.random() < 0.1) audio.playMovement();
+      break;
+  }
+}
+
+function applyPressure(x, y) {
+  particles.forEach(p => {
+    const dx = p.x - x;
+    const dy = p.y - y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < brushRadius) {
+      const force = (1 - dist / brushRadius) * 0.8;
+      // Non-Newtonian: resistance increases with force
+      p.vx *= (1 - force * 0.5);
+      p.vy *= (1 - force * 0.5);
+      p.solidarity = Math.min(1, p.solidarity + force * 0.03);
+    }
+  });
+
+  if (Math.random() < 0.1) audio.playPressure(x, y, globalPressure);
+}
+
+// ============ STATE DETECTION ============
+function detectState() {
+  let totalSolidarity = 0;
+  let totalSpeed = 0;
+  let totalCorruption = 0;
+
+  particles.forEach(p => {
+    totalSolidarity += p.solidarity;
+    totalSpeed += Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+    totalCorruption += p.corrupted;
+  });
+
+  cohesion = totalSolidarity / particles.length;
+  entropy = Math.min(1, totalSpeed / (particles.length * 2));
+  fakeNewsLevel = Math.max(0, fakeNewsLevel - 0.001);
+
+  let newState;
+  if (cohesion > 0.6) {
+    newState = 'solid';
+  } else if (cohesion > 0.35 && entropy < 0.4) {
+    newState = 'gelation';
+  } else if (entropy > 0.6) {
+    newState = 'fragment';
+  } else if (totalCorruption / particles.length > 0.3) {
+    newState = 'corrupted';
+  } else {
+    newState = 'liquid';
+  }
+
+  if (newState !== currentState) {
+    prevState = currentState;
+    currentState = newState;
+    onStateChange(newState);
+  }
+
+  updateHUD();
+}
+
+function onStateChange(state) {
+  const nameEl = document.getElementById('state-name');
+  const descEl = document.getElementById('state-desc');
+
+  const states = {
+    liquid: { name: '液態 LIQUID', desc: '社群自由流動，意見多元分散。動能如水，無固定形態。' },
+    solid: { name: '固態 SOLID', desc: '壓力下凝固——非牛頓流體的剪切增稠。社群團結但移動困難。' },
+    gelation: { name: '膠凝 GELATION', desc: '介於液態與固態之間。社群開始形成結構，但仍有彈性。' },
+    fragment: { name: '碎片化 FRAGMENTED', desc: '壓力驟然釋放，動能四散。意見極化，社群分裂。' },
+    corrupted: { name: '污染態 CORRUPTED', desc: '假新聞侵蝕了溝通基礎。真實與虛假混沌不分。' }
+  };
+
+  const s = states[state];
+  nameEl.textContent = s.name;
+  descEl.textContent = s.desc;
+
+  if (state === 'solid' && prevState !== 'solid') audio.playSolidify();
+  if (state === 'fragment' && prevState !== 'fragment') audio.playFragment();
+}
+
+function updateHUD() {
+  document.getElementById('hud-particles').textContent = `粒子數: ${particles.length}`;
+  document.getElementById('hud-cohesion').textContent = `凝聚力: ${(cohesion * 100).toFixed(0)}%`;
+  document.getElementById('hud-entropy').textContent = `離散度: ${(entropy * 100).toFixed(0)}%`;
+  document.getElementById('hud-fakenews').textContent = `假新聞濃度: ${(fakeNewsLevel * 100).toFixed(0)}%`;
+
+  const bar = document.getElementById('pressure-bar');
+  bar.style.width = `${globalPressure * 100}%`;
+  if (globalPressure > 0.7) {
+    bar.style.background = '#ff4466';
+  } else if (globalPressure > 0.4) {
+    bar.style.background = '#dd8844';
+  } else {
+    bar.style.background = '#4466aa';
+  }
+}
+
+// ============ DRAWING ============
+function drawBackground() {
+  // Gradient background that shifts with state
+  const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.7);
+
+  if (currentState === 'solid') {
+    grad.addColorStop(0, 'rgba(15, 15, 35, 1)');
+    grad.addColorStop(1, 'rgba(5, 5, 15, 1)');
+  } else if (currentState === 'corrupted') {
+    grad.addColorStop(0, 'rgba(25, 10, 10, 1)');
+    grad.addColorStop(1, 'rgba(10, 5, 5, 1)');
+  } else {
+    grad.addColorStop(0, 'rgba(12, 12, 25, 1)');
+    grad.addColorStop(1, 'rgba(5, 5, 12, 1)');
+  }
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawBrush() {
+  if (!mouseDown && !true) return; // Always show brush hint
+  ctx.beginPath();
+  ctx.arc(mouseX, mouseY, brushRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = mouseDown
+    ? `rgba(150, 200, 255, 0.3)`
+    : `rgba(100, 130, 180, 0.1)`;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ============ MAIN LOOP ============
+let lastTime = 0;
+
+function gameLoop(time) {
+  if (!gameStarted) { requestAnimationFrame(gameLoop); return; }
+
+  const dt = Math.min(0.05, (time - lastTime) / 1000);
+  lastTime = time;
+
+  // Pressure decay
+  if (!mouseDown) {
+    globalPressure = Math.max(0, globalPressure - 0.008);
+  }
+
+  drawBackground();
+
+  // Update and draw algorithm waves
+  algorithmWaves = algorithmWaves.filter(w => w.life > 0);
+  algorithmWaves.forEach(w => { w.update(); w.draw(); });
+
+  // Update and draw particles
+  particles.forEach(p => { p.update(dt); });
+  particles.forEach(p => { p.draw(); });
+
+  // Update and draw fake news
+  fakeNewsParticles = fakeNewsParticles.filter(f => f.life > 0);
+  fakeNewsParticles.forEach(f => { f.update(); f.draw(); });
+
+  // Apply tool if mouse is down
+  if (mouseDown) {
+    applyTool(mouseX, mouseY);
+    globalPressure = Math.min(1, globalPressure + 0.01);
+  }
+
+  drawBrush();
+  detectState();
+
+  // Update audio drone
+  audio.updateDrone(globalPressure, cohesion);
+
+  // Random events
+  eventTimer += dt;
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ============ INPUT ============
+canvas.addEventListener('mousedown', (e) => {
+  mouseDown = true;
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+});
+
+canvas.addEventListener('mouseup', () => {
+  mouseDown = false;
+});
+
+canvas.addEventListener('wheel', (e) => {
+  brushRadius = Math.max(20, Math.min(250, brushRadius - e.deltaY * 0.3));
+  e.preventDefault();
+}, { passive: false });
+
+// Touch support
+canvas.addEventListener('touchstart', (e) => {
+  mouseDown = true;
+  mouseX = e.touches[0].clientX;
+  mouseY = e.touches[0].clientY;
+  e.preventDefault();
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  mouseX = e.touches[0].clientX;
+  mouseY = e.touches[0].clientY;
+  e.preventDefault();
+});
+
+canvas.addEventListener('touchend', () => {
+  mouseDown = false;
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!gameStarted) return;
+
+  switch (e.key) {
+    case ' ':
+      triggerEvent();
+      e.preventDefault();
+      break;
+    case 'r':
+    case 'R':
+      resetSimulation();
+      break;
+    case '1': selectTool('pressure'); break;
+    case '2': selectTool('algorithm'); break;
+    case '3': selectTool('fakenews'); break;
+    case '4': selectTool('movement'); break;
+  }
+});
+
+function selectTool(tool) {
+  currentTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tool === tool);
+  });
+}
+
+function resetSimulation() {
+  particles = [];
+  fakeNewsParticles = [];
+  algorithmWaves = [];
+  globalPressure = 0;
+  fakeNewsLevel = 0;
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push(new Particle());
+  }
+}
+
+// ============ START ============
+function startGame() {
+  audio.init();
+  gameStarted = true;
+
+  const titleScreen = document.getElementById('title-screen');
+  titleScreen.style.opacity = 0;
+  setTimeout(() => titleScreen.style.display = 'none', 1500);
+
+  // Initialize particles
+  resetSimulation();
+
+  // Show UI
+  setTimeout(() => {
+    document.querySelectorAll('.hud-item').forEach(el => el.classList.add('show'));
+    document.getElementById('state-display').classList.add('show');
+    document.getElementById('pressure-bar-container').classList.add('show');
+    document.getElementById('pressure-label').classList.add('show');
+    document.getElementById('tool-panel').classList.add('show');
+    document.getElementById('instructions').classList.add('show');
+  }, 1000);
+
+  setTimeout(() => {
+    document.getElementById('instructions').classList.remove('show');
+  }, 8000);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
